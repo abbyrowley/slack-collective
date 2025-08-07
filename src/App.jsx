@@ -1,6 +1,9 @@
 import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+
 import AddSpotForm from './components/AddSpotForm';
-import MapView from './components/MapView'; // 🧭 make sure this path is correct
+import MapView from './components/MapView';
+import LineDetail from './components/LineDetail'; // ✅ Make sure this path is correct
 import 'leaflet/dist/leaflet.css';
 
 function App() {
@@ -13,7 +16,10 @@ function App() {
       <AddSpotForm />
 
       <div className="mt-12">
-        <MapView />
+        <Routes>
+          <Route path="/" element={<MapView />} />
+          <Route path="/line/:id" element={<LineDetail />} />
+        </Routes>
       </div>
     </div>
   );

@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import supabase from '../supabaseClient';
 
-
-
-export default function AddSpotForm() {
+export default function AddSpotForm({ onClose }) {
   const [form, setForm] = useState({
-  name: '',
-  startLat: '',
-  startLng: '',
-  endLat: '',
-  endLng: '',
-  anchorType: '',
-  lineType: '', // <-- new
-  length: '',
-  description: '',
-  approach: '',
-});
-
+    name: '',
+    startLat: '',
+    startLng: '',
+    endLat: '',
+    endLng: '',
+    anchorType: '',
+    lineType: '',
+    length: '',
+    description: '',
+    approach: '',
+    tag: '',
+    established: '',
+    firstAscent: '',
+  });
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -24,8 +24,7 @@ export default function AddSpotForm() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-  
-    // Parse numeric fields
+
     const payload = {
       ...form,
       startLat: parseFloat(form.startLat) || null,
@@ -34,13 +33,12 @@ export default function AddSpotForm() {
       endLng: parseFloat(form.endLng) || null,
       length: parseFloat(form.length) || null,
     };
-  
+
     const { data, error } = await supabase.from('spots').insert([payload]);
-  
+
     if (error) {
       console.error('Error inserting spot:', error);
       alert(`Error: ${error.message}`);
-    
     } else {
       console.log('Spot submitted:', data);
       alert('Spot submitted successfully!');
@@ -51,18 +49,35 @@ export default function AddSpotForm() {
         endLat: '',
         endLng: '',
         anchorType: '',
+        lineType: '',
         length: '',
         description: '',
         approach: '',
+        tag: '',
+        established: '',
+        firstAscent: '',
       });
+      if (onClose) onClose(); // Close form after submission
     }
   }
-  
-  
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto p-4 bg-primary  text-primary rounded-md">
-      <h2 className="text-xl font-semibold mb-4 text-secondary">Add a New Highline Spot</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="max-w-md mx-auto p-4 bg-primary text-primary rounded-md shadow-md"
+    >
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-secondary">Add a New Highline Spot</h2>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-white font-bold text-xl hover:text-accent transition"
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
       <label className="block mb-2 text-secondary">
         Name:
@@ -77,20 +92,20 @@ export default function AddSpotForm() {
       </label>
 
       <label className="block mb-4 text-secondary">
-  Line Type:
-  <select
-    name="lineType"
-    value={form.lineType}
-    onChange={handleChange}
-    required
-    className="w-full p-2 border rounded text-primary"
-  >
-    <option value="">Select type</option>
-    <option value="highline">Highline</option>
-    <option value="waterline">Waterline</option>
-    <option value="slackline">Slackline</option>
-  </select>
-</label>
+        Line Type:
+        <select
+          name="lineType"
+          value={form.lineType}
+          onChange={handleChange}
+          required
+          className="w-full p-2 border rounded text-primary"
+        >
+          <option value="">Select type</option>
+          <option value="highline">Highline</option>
+          <option value="waterline">Waterline</option>
+          <option value="slackline">Slackline</option>
+        </select>
+      </label>
 
       <label className="block mb-2 text-secondary">
         Start Latitude:
@@ -166,6 +181,38 @@ export default function AddSpotForm() {
         />
       </label>
 
+      <label className="block mb-2 text-secondary">
+        Tag:
+        <input
+          type="text"
+          name="tag"
+          value={form.tag}
+          onChange={handleChange}
+          className="w-full p-2 border rounded text-primary"
+        />
+      </label>
+
+      <label className="block mb-2 text-secondary">
+        Established by:
+        <input
+          type="text"
+          name="established"
+          value={form.established}
+          onChange={handleChange}
+          className="w-full p-2 border rounded text-primary"
+        />
+      </label>
+
+      <label className="block mb-2 text-secondary">
+        FA:
+        <input
+          type="text"
+          name="firstAscent"
+          value={form.firstAscent}
+          onChange={handleChange}
+          className="w-full p-2 border rounded text-primary"
+        />
+      </label>
 
       <label className="block mb-4 text-secondary">
         Description:
@@ -174,7 +221,7 @@ export default function AddSpotForm() {
           value={form.description}
           onChange={handleChange}
           rows="3"
-          className="w-full p-2 border rounded text-primary" 
+          className="w-full p-2 border rounded text-primary"
         />
       </label>
 
@@ -191,10 +238,11 @@ export default function AddSpotForm() {
 
       <button
         type="submit"
-        className="bg-accent text-white px-4 py-2 rounded hover:bg-green"
+        className="bg-accent text-white px-4 py-2 rounded hover:bg-green transition-colors duration-300"
       >
         Submit Spot
       </button>
     </form>
   );
 }
+

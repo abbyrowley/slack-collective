@@ -4,14 +4,12 @@ import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   Tooltip,
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { useNavigate } from 'react-router-dom';
-
 
 // Fix leaflet icon paths for default markers
 delete L.Icon.Default.prototype._getIconUrl;
@@ -33,7 +31,6 @@ function createClusterIcon(cluster) {
   const types = new Set(markers.map(m => m.options.lineType?.toLowerCase()));
   const count = cluster.getChildCount();
 
-  // Color is the type’s color if all same type; else gray
   const color = types.size === 1
     ? typeColors[[...types][0]] || '#47A979'
     : '#47A979';
@@ -55,8 +52,7 @@ function createClusterIcon(cluster) {
   ">
     ${count}
   </div>
-`;
-
+  `;
 
   return L.divIcon({
     html,
@@ -87,8 +83,7 @@ function createLabelIcon(length, color) {
   });
 }
 
-
-export default function MapView() {
+export default function MapView({ showForm, setShowForm }) {
   const [spots, setSpots] = useState([]);
 
   useEffect(() => {
@@ -104,12 +99,12 @@ export default function MapView() {
   }, []);
 
   const [visibleTypes, setVisibleTypes] = useState({
-  highline: true,
-  waterline: true,
-  parkline: true,
-});
+    highline: true,
+    waterline: true,
+    parkline: true,
+  });
 
-  const [minLength, setMinLength] = useState(''); 
+  const [minLength, setMinLength] = useState('');
   const [maxLength, setMaxLength] = useState('');
 
   const navigate = useNavigate();
@@ -118,105 +113,113 @@ export default function MapView() {
   const zoom = 4;
 
   return (
-  <div className="flex flex-col lg:flex-row gap-4">
-    {/* Filters Section */}
-    <div className="w-full lg:w-1/4 flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Filters</h2>
+    <div className="flex flex-col lg:flex-row gap-4">
+      {/* Filters Section */}
+      <div className="w-full lg:w-1/4 flex flex-col gap-4 relative">
+        <h2 className="text-lg font-semibold">Filters</h2>
 
-      {/* Type Filter Buttons */}
-      <div className="flex flex-wrap gap-2">
-        {Object.keys(typeColors).map((type) => (
-          <button
-  key={type}
-  onClick={() =>
-    setVisibleTypes((prev) => ({
-      ...prev,
-      [type]: !prev[type],
-    }))
-  }
-  className={`px-3 py-1 rounded-sm font-medium transform transition duration-150 hover:scale-105`}
-  style={{
-    backgroundColor: 'black',
-    color: 'white',
-    border: visibleTypes[type] ? `2px solid ${typeColors[type]}` : ' 2px solid black',
-  }}
->
-  {type.charAt(0).toUpperCase() + type.slice(1)}
-</button>
-        ))}
+        {/* Type Filter Buttons */}
+        <div className="flex flex-wrap gap-2">
+          {Object.keys(typeColors).map((type) => (
+            <button
+              key={type}
+              onClick={() =>
+                setVisibleTypes((prev) => ({
+                  ...prev,
+                  [type]: !prev[type],
+                }))
+              }
+              className={`px-3 py-1 rounded-sm font-medium transform transition duration-150 hover:scale-105`}
+              style={{
+                backgroundColor: 'white',
+                color: 'black',
+                border: visibleTypes[type] ? `2px solid ${typeColors[type]}` : '2px solid white',
+              }}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Length Filter */}
+        <div className="flex gap-2 items-center">
+          <label className="text-mdS font-medium text-black">Length:</label>
+          <input
+            type="number"
+            placeholder="Min"
+            value={minLength}
+            onChange={(e) => setMinLength(e.target.value)}
+            className="border px-2 py-1 rounded-sm w-16"
+          />
+          <span className="text-black">to</span>
+          <input
+            type="number"
+            placeholder="Max"
+            value={maxLength}
+            onChange={(e) => setMaxLength(e.target.value)}
+            className="border px-2 py-1 rounded-sm w-16"
+          />
+          <span className="text-black">meters</span>
+        </div>
+
+        {/* Add Line Button or Close Button */}
+        {!showForm && (
+  <button
+    onClick={() => setShowForm(true)}
+    className="mt-4 bg-primary text-white px-4 py-2 rounded-sm shadow hover:bg-accent transition"
+  >
+    + Add Line
+  </button>
+)}
+
       </div>
 
-      {/* Length Filter */}
-      <div className="flex gap-2 items-center">
-        <label className="text-mdS font-medium text-white">Length:</label>
-        <input
-          type="number"
-          placeholder="Min"
-          value={minLength}
-          onChange={(e) => setMinLength(e.target.value)}
-          className="border px-2 py-1 rounded-sm w-16"
-        />
-        <span className='text-white'>to</span>
-        <input
-          type="number"
-          placeholder="Max"
-          value={maxLength}
-          onChange={(e) => setMaxLength(e.target.value)}
-          className="border px-2 py-1 rounded-sm w-16"
-        />
-        <span className='text-white'>meters</span>
+      {/* Map Section */}
+      <div className="h-[500px] w-full lg:w-3/4 rounded-sm shadow">
+        <MapContainer
+          center={defaultCenter}
+          zoom={zoom}
+          scrollWheelZoom={true}
+          className="h-full w-full"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <MarkerClusterGroup iconCreateFunction={createClusterIcon} chunkedLoading>
+            {spots.map((spot) => {
+              const lineType = spot.lineType?.toLowerCase();
+              const color = typeColors[lineType] || '#47A979';
+
+              if (!visibleTypes[lineType]) return null;
+              if (minLength && spot.length < Number(minLength)) return null;
+              if (maxLength && spot.length > Number(maxLength)) return null;
+
+              return (
+                <Marker
+                  key={spot.id}
+                  position={[spot.startLat, spot.startLng]}
+                  icon={createLabelIcon(spot.length, color)}
+                  lineType={lineType}
+                  eventHandlers={{
+                    click: () => navigate(`/line/${spot.id}`), // fix path here, was /lines/
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
+                    <div>
+                      <strong>{spot.name}</strong><br />
+                      Type: {spot.lineType}<br />
+                      Length: {spot.length} m<br />
+                    </div>
+                  </Tooltip>
+                </Marker>
+              );
+            })}
+          </MarkerClusterGroup>
+        </MapContainer>
       </div>
     </div>
-
-    {/* Map Section */}
-    <div className="h-[500px] w-full lg:w-3/4 rounded-sm shadow">
-      <MapContainer
-        center={defaultCenter}
-        zoom={zoom}
-        scrollWheelZoom={true}
-        className="h-full w-full"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        <MarkerClusterGroup iconCreateFunction={createClusterIcon} chunkedLoading>
-          {spots.map((spot) => {
-            const lineType = spot.lineType?.toLowerCase();
-            const color = typeColors[lineType] || '#47A979';
-
-            if (!visibleTypes[lineType]) return null;
-            if (minLength && spot.length < Number(minLength)) return null;
-            if (maxLength && spot.length > Number(maxLength)) return null;
-
-            return (
-              <Marker
-  key={spot.id}
-  position={[spot.startLat, spot.startLng]}
-  icon={createLabelIcon(spot.length, color)}
-  lineType={lineType}
-  eventHandlers={{
-    click: () => navigate(`/lines/${spot.id}`),
-  }}
->
-  <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
-    <div>
-      <strong>{spot.name}</strong><br />
-      Length: {spot.length} m<br />
-      Anchor: {spot.anchorType}<br />
-      {spot.description}
-    </div>
-  </Tooltip>
-</Marker>
-
-            );
-          })}
-        </MarkerClusterGroup>
-      </MapContainer>
-    </div>
-  </div>
-);
-
-
+  );
 }
+

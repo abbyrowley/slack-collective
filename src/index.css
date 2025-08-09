@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Arrow styles */
+.swiper-button-prev,
+.swiper-button-next {
+  color: #000; /* black arrows */
+  border-radius: 9999px;
+  padding: 8px;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.swiper-button-prev.swiper-button-disabled,
+.swiper-button-next.swiper-button-disabled {
+  color: #888;           /* gray arrows when disabled */
+  cursor: not-allowed;
+}
+
+/* Dot (pagination bullet) styles */
+.swiper-pagination-bullet {
+  background-color: #ccc; /* light gray by default */
+  opacity: 0.6;
+  transition: background-color 0.3s ease;
+}
+
+.swiper-pagination-bullet-active {
+  background-color: #000; /* black when active */
+  opacity: 1;
+}

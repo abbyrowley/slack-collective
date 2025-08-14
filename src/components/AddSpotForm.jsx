@@ -1,7 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import supabase from '../supabaseClient';
 
-export default function AddSpotForm({ onClose }) {
+// Google reverse geocoding helper
+async function reverseGeocode(lat, lng) {
+  const API_KEY = 'AIzaSyBj1srff7buf9xMw4vlerYS6Qfs4S4Edvg'; // <-- Replace with your Google API key
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${API_KEY}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status !== 'OK' || !data.results.length) {
+      throw new Error('No results found');
+    }
+
+    const result = data.results[0];
+    const components = result.address_components;
+
+    const countryObj = components.find(c => c.types.includes('country'));
+    const stateObj = components.find(c => c.types.includes('administrative_area_level_1'));
+    const cityObj = components.find(c =>
+      c.types.includes('locality') ||
+      c.types.includes('postal_town') ||
+      c.types.includes('sublocality')
+    );
+
+    return {
+      country: countryObj?.long_name || 'Unknown Country',
+      state: stateObj?.long_name || 'Unknown State/Province',
+      city: cityObj?.long_name || 'Unknown City'
+    };
+  } catch (err) {
+    console.error('Google reverse geocoding failed:', err);
+    return {
+      country: 'Unknown Country',
+      state: 'Unknown State/Province',
+      city: 'Unknown City'
+    };
+  }
+}
+
+export default function AddSpotForm({ onClose, startLat, startLng, endLat, endLng, setLines }) {
   const [form, setForm] = useState({
     name: '',
     startLat: '',
@@ -18,6 +57,17 @@ export default function AddSpotForm({ onClose }) {
     firstAscent: '',
   });
 
+  // Sync form with map coordinates
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      startLat: startLat || '',
+      startLng: startLng || '',
+      endLat: endLat || '',
+      endLng: endLng || '',
+    }));
+  }, [startLat, startLng, endLat, endLng]);
+
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
@@ -25,23 +75,40 @@ export default function AddSpotForm({ onClose }) {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    const payload = {
-      ...form,
-      startLat: parseFloat(form.startLat) || null,
-      startLng: parseFloat(form.startLng) || null,
-      endLat: parseFloat(form.endLat) || null,
-      endLng: parseFloat(form.endLng) || null,
-      length: parseFloat(form.length) || null,
-    };
+    if (!form.startLat || !form.startLng) {
+      alert('Please select a location on the map.');
+      return;
+    }
 
-    const { data, error } = await supabase.from('spots').insert([payload]);
+    try {
+      // Reverse geocode start coordinates using Google
+      const locationData = await reverseGeocode(form.startLat, form.startLng);
 
-    if (error) {
-      console.error('Error inserting spot:', error);
-      alert(`Error: ${error.message}`);
-    } else {
-      console.log('Spot submitted:', data);
-      alert('Spot submitted successfully!');
+      // Prepare payload for Supabase
+      const payload = {
+        ...form,
+        startLat: parseFloat(form.startLat) || null,
+        startLng: parseFloat(form.startLng) || null,
+        endLat: parseFloat(form.endLat) || null,
+        endLng: parseFloat(form.endLng) || null,
+        length: parseFloat(form.length) || null,
+        locationData,
+      };
+
+      // Insert into Supabase and get inserted row
+      const { data, error } = await supabase.from('spots').insert([payload]).select();
+      if (error) {
+        console.error('Error inserting spot:', error);
+        alert(`Error: ${error.message}`);
+        return;
+      }
+
+      const newLine = data[0];
+
+      // Update App's lines state immediately
+      if (setLines) setLines((prev) => [...prev, newLine]);
+
+      // Reset form and close
       setForm({
         name: '',
         startLat: '',
@@ -57,17 +124,22 @@ export default function AddSpotForm({ onClose }) {
         established: '',
         firstAscent: '',
       });
-      if (onClose) onClose(); // Close form after submission
+
+      if (onClose) onClose();
+      alert('Spot submitted successfully!');
+    } catch (err) {
+      console.error('Failed to add new spot:', err);
+      alert('Failed to add new spot. See console for details.');
     }
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-md mx-auto p-4 bg-primary text-primary rounded-md shadow-md"
+      className="max-w-md mx-auto p-4 bg-primary text-primary rounded-sm shadow-md"
     >
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-secondary">Add a New Highline Spot</h2>
+        <h2 className="text-xl font-semibold text-secondary">Add a New Line</h2>
         {onClose && (
           <button
             type="button"
@@ -91,6 +163,58 @@ export default function AddSpotForm({ onClose }) {
         />
       </label>
 
+      {/* Coordinates rows */}
+      <div className="flex gap-4 mb-4">
+        <label className="flex-1 text-gray-200 text-sm">
+          Start Latitude:
+          <input
+            type="number"
+            name="startLat"
+            value={form.startLat}
+            onChange={handleChange}
+            step="any"
+            required
+            className="w-full p-1 border rounded text-primary text-sm"
+          />
+        </label>
+        <label className="flex-1 text-gray-200 text-sm">
+          Start Longitude:
+          <input
+            type="number"
+            name="startLng"
+            value={form.startLng}
+            onChange={handleChange}
+            step="any"
+            required
+            className="w-full p-1 border rounded text-primary text-sm"
+          />
+        </label>
+      </div>
+      <div className="flex gap-4 mb-4">
+        <label className="flex-1 text-gray-200 text-sm">
+          End Latitude:
+          <input
+            type="number"
+            name="endLat"
+            value={form.endLat}
+            onChange={handleChange}
+            step="any"
+            className="w-full p-1 border rounded text-primary text-sm"
+          />
+        </label>
+        <label className="flex-1 text-gray-200 text-sm">
+          End Longitude:
+          <input
+            type="number"
+            name="endLng"
+            value={form.endLng}
+            onChange={handleChange}
+            step="any"
+            className="w-full p-1 border rounded text-primary text-sm"
+          />
+        </label>
+      </div>
+
       <label className="block mb-4 text-secondary">
         Line Type:
         <select
@@ -101,60 +225,10 @@ export default function AddSpotForm({ onClose }) {
           className="w-full p-2 border rounded text-primary"
         >
           <option value="">Select type</option>
-          <option value="highline">Highline</option>
-          <option value="waterline">Waterline</option>
-          <option value="slackline">Slackline</option>
+          <option value="Highline">Highline</option>
+          <option value="Waterline">Waterline</option>
+          <option value="Parkline">Slackline</option>
         </select>
-      </label>
-
-      <label className="block mb-2 text-secondary">
-        Start Latitude:
-        <input
-          type="number"
-          name="startLat"
-          value={form.startLat}
-          onChange={handleChange}
-          step="any"
-          required
-          className="w-full p-2 border rounded text-primary"
-        />
-      </label>
-
-      <label className="block mb-2 text-secondary">
-        Start Longitude:
-        <input
-          type="number"
-          name="startLng"
-          value={form.startLng}
-          onChange={handleChange}
-          step="any"
-          required
-          className="w-full p-2 border rounded text-primary"
-        />
-      </label>
-
-      <label className="block mb-2 text-secondary">
-        End Latitude:
-        <input
-          type="number"
-          name="endLat"
-          value={form.endLat}
-          onChange={handleChange}
-          step="any"
-          className="w-full p-2 border rounded text-primary"
-        />
-      </label>
-
-      <label className="block mb-2 text-secondary">
-        End Longitude:
-        <input
-          type="number"
-          name="endLng"
-          value={form.endLng}
-          onChange={handleChange}
-          step="any"
-          className="w-full p-2 border rounded text-primary"
-        />
       </label>
 
       <label className="block mb-2 text-secondary">
@@ -245,4 +319,8 @@ export default function AddSpotForm({ onClose }) {
     </form>
   );
 }
+
+
+
+
 
